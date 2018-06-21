@@ -2,28 +2,22 @@
 {
     using System;
     using System.Collections.Generic;
-    using System.Linq;
-    using System.Net.Http;
     using System.Text.RegularExpressions;
     using System.Threading;
     using System.Threading.Tasks;
     using System.Windows.Forms;
-    using Easy.Common;
-    using Easy.Common.Extensions;
 
     public sealed class MediaSourceDiscoveryService : IDisposable
     {
-        private readonly HttpClient _client;
         private readonly WebBrowser _browser;
         private readonly Dictionary<Channel, Uri> _channelsMap;
         private readonly Regex _sourceRegex;
         private readonly ManualResetEventSlim _waitHandle;
 
-        private TaskCompletionSource<Uri[]> _reqeust;
+        private TaskCompletionSource<Uri> _reqeust;
 
         public MediaSourceDiscoveryService()
         {
-            _client = new HttpClient();
             _sourceRegex = new Regex(@"<source\ssrc=""(?<src>.*m3u8\?.*)""\stype");
             _waitHandle = new ManualResetEventSlim(true);
 
@@ -72,11 +66,11 @@
             };
         }
 
-        public Task<Uri[]> GetSource(Channel channel)
+        public Task<Uri> GetSource(Channel channel)
         {
             _waitHandle.Wait();
 
-            _reqeust = new TaskCompletionSource<Uri[]>();
+            _reqeust = new TaskCompletionSource<Uri>();
 
             _browser.Navigate(_channelsMap[channel]);
             _waitHandle.Reset();
@@ -90,7 +84,7 @@
             _waitHandle?.Dispose();
         }
 
-        private async void OnDocumentCompleted(object sender, WebBrowserDocumentCompletedEventArgs e)
+        private void OnDocumentCompleted(object sender, WebBrowserDocumentCompletedEventArgs e)
         {
             var browser = (WebBrowser)sender;
 
@@ -104,32 +98,12 @@
                     throw new InvalidOperationException("Unable to match the input: " + src);
                 }
 
-                var theSource = await GetSourceUri(new Uri(result.Groups["src"].Value));
-                _reqeust.SetResult(theSource);
+                _reqeust.SetResult(new Uri(result.Groups["src"].Value));
             }
             finally
             {
                 _waitHandle.Set();
             }
-        }
-
-        private async Task<Uri[]> GetSourceUri(Uri uri)
-        {
-            var sourcesStr = await Retry.OnAny<
-                HttpRequestException,
-                ArgumentNullException,
-                InvalidOperationException,
-                TaskCanceledException,
-                string>(() => _client.GetStringAsync(uri),
-                100.Milliseconds(),
-                500.Milliseconds(),
-                1.Seconds());
-
-            return sourcesStr.Split('\n')
-                .Where(l => !l.StartsWith("#"))
-                .Select(src => new Uri($"{uri.Scheme}://{uri.Authority}{uri.Segments[0]}{uri.Segments[1]}{src}"))
-                .Reverse()
-                .ToArray();
         }
     }
 
