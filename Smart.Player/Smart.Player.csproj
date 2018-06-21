@@ -111,4 +111,8 @@
     </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>xcopy "$(SolutionDir)Assets\icons\*.*" "$(TargetDir)icons" /Y /I /E
+xcopy "$(SolutionDir)Assets\lib\libvlc\win-x32\*.*" "$(TargetDir)libvlc" /Y /I /E</PostBuildEvent>
+  </PropertyGroup>
 </Project>

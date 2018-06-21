@@ -295,7 +295,7 @@
         {
             var src = await _discoverSvc.GetSource(channel);
             _currentChannel = channel;
-            _vlcControl.Play(src[0]);
+            _vlcControl.Play(src);
         }
 
         private void ToggleFullscreen()
